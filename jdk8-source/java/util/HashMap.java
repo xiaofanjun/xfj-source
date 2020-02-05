@@ -254,6 +254,8 @@ public class HashMap<K, V> extends AbstractMap<K, V>
      * than 2 and should be at least 8 to mesh with assumptions in
      * tree removal about conversion back to plain bins upon
      * shrinkage.
+     * <p>
+     * 区分是需要进行转换为 红黑树 的界点
      */
     static final int TREEIFY_THRESHOLD = 8;
 
@@ -419,6 +421,8 @@ public class HashMap<K, V> extends AbstractMap<K, V>
 
     /**
      * The number of key-value mappings contained in this map.
+     * <p>
+     * 当前map对象的当前长度
      */
     transient int size;
 
@@ -428,6 +432,11 @@ public class HashMap<K, V> extends AbstractMap<K, V>
      * the HashMap or otherwise modify its internal structure (e.g.,
      * rehash).  This field is used to make iterators on Collection-views of
      * the HashMap fail-fast.  (See ConcurrentModificationException).
+     * <p>
+     * <p>
+     * HashMap被修改或者删除的次数总数；
+     * 作用：线程同步问题，fail-fast(快速失败机制)
+     * 在遍历Map时，应尽量使用迭代器去遍历。
      */
     transient int modCount;
 
@@ -642,10 +651,10 @@ public class HashMap<K, V> extends AbstractMap<K, V>
      */
     final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                    boolean evict) {
-        Node<K, V>[] tab;
-        Node<K, V> p;
+        Node<K, V>[] tab;// 表示存放一个map对象中的node数据
+        Node<K, V> p; // 该次需要存放的节点数据
         int n; // map 的 长度
-        int i; //
+        int i; // Node数组的下标
         // 第一次向map 中插入数据时
         if ((tab = table) == null || (n = tab.length) == 0) {
             // 调用 resize() 方法 初始化 map 的长度
@@ -656,28 +665,35 @@ public class HashMap<K, V> extends AbstractMap<K, V>
         // 15(1111) & 17(10001) 和 17 % 16 的结果都是1，这两个操作结果是一样的;
         // & 预算比 % 运算 效率高 ; 因为 & 是二位运算符。
         if ((p = tab[i = (n - 1) & hash]) == null) {// 如果该下标下没有值 （判断是否散列冲突）
-            // 不冲突：
-            // 向该下标下添加一个node(存放数据)
+            // 不冲突
             tab[i] = newNode(hash, key, value, null);
         } else {
             // 散列冲突
-            Node<K, V> e;
-            K k;
+            // 会走该段逻辑的场景有： map 长度 <=16时： map中已存在相同的对象(key),hash 值相同的; map 长度 > 16时；
+            Node<K, V> e;// 下一个Node 节点
+            K k;// 传入的key
+            // 场景： map中已存在相同key
             if (p.hash == hash && ((k = p.key) == key || (key != null && key.equals(k))))
                 e = p;
-            else if (p instanceof TreeNode)
+                    // 场景: key 类型是 LinkedHashMap 类型的对象
+            else if (p instanceof TreeNode)//TreeNode 继承HashMap的Node,所以 p是父类，TreeNode是子类，处理的是TreeNode 类型的
                 e = ((TreeNode<K, V>) p).putTreeVal(this, tab, hash, key, value);
             else {
                 for (int binCount = 0; ; ++binCount) {
-                    if ((e = p.next) == null) {
+                    if ((e = p.next) == null) {//如果下一个节点为空
                         p.next = newNode(hash, key, value, null);
-                        if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                        // 如果链表深度超过 8 转换为红黑树
+                        if (binCount >= TREEIFY_THRESHOLD - 1) {// -1 for 1st
+                            // 进行红黑树处理
                             treeifyBin(tab, hash);
+                        }
                         break;
                     }
+                    //
                     if (e.hash == hash &&
-                            ((k = e.key) == key || (key != null && key.equals(k))))
+                            ((k = e.key) == key || (key != null && key.equals(k)))) {
                         break;
+                    }
                     p = e;
                 }
             }
@@ -689,10 +705,11 @@ public class HashMap<K, V> extends AbstractMap<K, V>
                 return oldValue;
             }
         }
-        ++modCount;
-        if (++size > threshold)
+        ++modCount;//修改次数加1
+        if (++size > threshold) {// 12=16*0.75 ; 长度大于12 ，重新刷新长度 该值在存放第一个数据时初始化
             resize();
-        afterNodeInsertion(evict);
+        }
+        afterNodeInsertion(evict);//该方法，该jdk1.8版本没有做任何处理
         return null;
     }
 
@@ -703,16 +720,12 @@ public class HashMap<K, V> extends AbstractMap<K, V>
      * elements from each bin must either stay at same index, or move
      * with a power of two offset in the new table.
      *
+     * @return
      * @Author ZQ
      * @Description 重置 map 长度
      * @Date 2020/1/29 10:35
      * @Param
-     * @return
      **/
-     *@return
-    the table
-     */
-
     final Node<K, V>[] resize() {
         Node<K, V>[] oldTab = table;
         int oldCap = (oldTab == null) ? 0 : oldTab.length;
